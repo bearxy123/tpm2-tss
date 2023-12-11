@@ -122,11 +122,6 @@ TPM_RESULT TPMLIB_MainInit(void)
     assert_int_equal(ret, 0);
     ret = global_callbacks.tpm_io_init();
     assert_int_equal(ret, 0);
-    ret = global_callbacks.tpm_nvram_loaddata((unsigned char **) 1,
-                                               (uint32_t *) 2,
-                                               3,
-                                               "4");
-    assert_int_equal(ret, TPM_RETRY);
     return mock_type(int);
 }
 TPM_RESULT TPMLIB_Process(unsigned char **resp_buf, uint32_t *resp_len, uint32_t *resp_buf_len, unsigned char *cmd, uint32_t cmd_len)
@@ -138,9 +133,6 @@ TPM_RESULT TPMLIB_Process(unsigned char **resp_buf, uint32_t *resp_len, uint32_t
     ret = global_callbacks.tpm_io_getlocality(&locality, 0);
     assert_int_equal(ret, 0);
     check_expected(locality);
-
-    ret = global_callbacks.tpm_nvram_storedata((unsigned char *) 1, 2, 3, "4");
-    assert_int_equal(ret, TPM_SUCCESS);
 
     unsigned char *buf_out = mock_type(unsigned char *);
     *resp_buf_len = *resp_len = mock_type(uint32_t);
@@ -158,6 +150,10 @@ TPM_RESULT TPMLIB_SetState(enum TPMLIB_StateType st, const unsigned char *buf, u
 }
 void TPMLIB_Terminate(void)
 {
+}
+TPM_RESULT TPM_IO_TpmEstablished_Reset(void)
+{
+    return TPM_SUCCESS;
 }
 
 void *__wrap_dlopen(const char *filename, int flags)
@@ -424,6 +420,10 @@ tcti_libtpms_init_state_open_fail_test(void **state)
     expect_string(__wrap_dlsym, symbol, "TPMLIB_Terminate");
     will_return(__wrap_dlsym, &TPMLIB_Terminate);
 
+    expect_value(__wrap_dlsym, handle, LIBTPMS_DL_HANDLE);
+    expect_string(__wrap_dlsym, symbol, "TPM_IO_TpmEstablished_Reset");
+    will_return(__wrap_dlsym, &TPM_IO_TpmEstablished_Reset);
+
     /* fail open */
     expect_string(__wrap_open, pathname, STATEFILE_PATH);
     expect_value(__wrap_open, flags, O_RDWR | O_CREAT);
@@ -484,6 +484,10 @@ tcti_libtpms_init_state_lseek_fail_test(void **state)
     expect_value(__wrap_dlsym, handle, LIBTPMS_DL_HANDLE);
     expect_string(__wrap_dlsym, symbol, "TPMLIB_Terminate");
     will_return(__wrap_dlsym, &TPMLIB_Terminate);
+
+    expect_value(__wrap_dlsym, handle, LIBTPMS_DL_HANDLE);
+    expect_string(__wrap_dlsym, symbol, "TPM_IO_TpmEstablished_Reset");
+    will_return(__wrap_dlsym, &TPM_IO_TpmEstablished_Reset);
 
     expect_string(__wrap_open, pathname, STATEFILE_PATH);
     expect_value(__wrap_open, flags, O_RDWR | O_CREAT);
@@ -555,6 +559,10 @@ tcti_libtpms_init_state_posix_fallocate_fail_test(void **state)
     expect_value(__wrap_dlsym, handle, LIBTPMS_DL_HANDLE);
     expect_string(__wrap_dlsym, symbol, "TPMLIB_Terminate");
     will_return(__wrap_dlsym, &TPMLIB_Terminate);
+
+    expect_value(__wrap_dlsym, handle, LIBTPMS_DL_HANDLE);
+    expect_string(__wrap_dlsym, symbol, "TPM_IO_TpmEstablished_Reset");
+    will_return(__wrap_dlsym, &TPM_IO_TpmEstablished_Reset);
 
     expect_string(__wrap_open, pathname, STATEFILE_PATH);
     expect_value(__wrap_open, flags, O_RDWR | O_CREAT);
@@ -632,6 +640,10 @@ tcti_libtpms_init_state_mmap_fail_test(void **state)
     expect_value(__wrap_dlsym, handle, LIBTPMS_DL_HANDLE);
     expect_string(__wrap_dlsym, symbol, "TPMLIB_Terminate");
     will_return(__wrap_dlsym, &TPMLIB_Terminate);
+
+    expect_value(__wrap_dlsym, handle, LIBTPMS_DL_HANDLE);
+    expect_string(__wrap_dlsym, symbol, "TPM_IO_TpmEstablished_Reset");
+    will_return(__wrap_dlsym, &TPM_IO_TpmEstablished_Reset);
 
     expect_string(__wrap_open, pathname, STATEFILE_PATH);
     expect_value(__wrap_open, flags, O_RDWR | O_CREAT);
@@ -728,6 +740,10 @@ tcti_libtpms_init_from_conf(const char *conf)
     expect_value(__wrap_dlsym, handle, LIBTPMS_DL_HANDLE);
     expect_string(__wrap_dlsym, symbol, "TPMLIB_Terminate");
     will_return(__wrap_dlsym, &TPMLIB_Terminate);
+
+    expect_value(__wrap_dlsym, handle, LIBTPMS_DL_HANDLE);
+    expect_string(__wrap_dlsym, symbol, "TPM_IO_TpmEstablished_Reset");
+    will_return(__wrap_dlsym, &TPM_IO_TpmEstablished_Reset);
 
     if (conf != NULL) {
         expect_string(__wrap_open, pathname, STATEFILE_PATH);
@@ -852,6 +868,10 @@ tcti_libtpms_init_from_conf_real(const char *conf)
     expect_string(__wrap_dlsym, symbol, "TPMLIB_Terminate");
     will_return(__wrap_dlsym, &TPMLIB_Terminate);
 
+    expect_value(__wrap_dlsym, handle, LIBTPMS_DL_HANDLE);
+    expect_string(__wrap_dlsym, symbol, "TPM_IO_TpmEstablished_Reset");
+    will_return(__wrap_dlsym, &TPM_IO_TpmEstablished_Reset);
+
     if (conf != NULL) {
         expect_string(__wrap_open, pathname, conf);
         expect_value(__wrap_open, flags, O_RDWR | O_CREAT);
@@ -899,7 +919,7 @@ tcti_libtpms_locality_success_test(void **state)
     rc = Tss2_Tcti_SetLocality(ctx, 4);
     assert_int_equal(rc, TSS2_RC_SUCCESS);
 
-    expect_value(TPMLIB_Process, cmd, cmd);
+    expect_memory(TPMLIB_Process, cmd, cmd, sizeof(cmd));
     expect_value(TPMLIB_Process, cmd_len, sizeof(cmd));
     expect_value(TPMLIB_Process, locality, 4); /* expect locality 4 */
     will_return(TPMLIB_Process, rsp);
@@ -919,7 +939,7 @@ tcti_libtpms_transmit_success_test(void **state)
     unsigned char cmd[] = {0x80, 0x01, 0x00, 0x00, 0x00, 0x0c, 0x00, 0x00, 0x01, 0x44, 0x00, 0x00};
     unsigned char rsp[] = {0x80, 0x01, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00};
 
-    expect_value(TPMLIB_Process, cmd, cmd);
+    expect_memory(TPMLIB_Process, cmd, cmd, sizeof(cmd));
     expect_value(TPMLIB_Process, cmd_len, sizeof(cmd));
     expect_value(TPMLIB_Process, locality, 0);
     will_return(TPMLIB_Process, rsp);
@@ -994,7 +1014,7 @@ tcti_libtpms_remap_state_success_test(void **state)
     unsigned char cmd[] = {0x80, 0x01, 0x00, 0x00, 0x00, 0x0c, 0x00, 0x00, 0x01, 0x44, 0x00, 0x00};
     unsigned char rsp[] = {0x80, 0x01, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00};
 
-    expect_value(TPMLIB_Process, cmd, cmd);
+    expect_memory(TPMLIB_Process, cmd, cmd, sizeof(cmd));
     expect_value(TPMLIB_Process, cmd_len, sizeof(cmd));
     expect_value(TPMLIB_Process, locality, 0);
     will_return(TPMLIB_Process, rsp);
@@ -1051,7 +1071,7 @@ tcti_libtpms_remap_state_mremap_fail_test(void **state)
     unsigned char cmd[] = {0x80, 0x01, 0x00, 0x00, 0x00, 0x0c, 0x00, 0x00, 0x01, 0x44, 0x00, 0x00};
     unsigned char rsp[] = {0x80, 0x01, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00};
 
-    expect_value(TPMLIB_Process, cmd, cmd);
+    expect_memory(TPMLIB_Process, cmd, cmd, sizeof(cmd));
     expect_value(TPMLIB_Process, cmd_len, sizeof(cmd));
     expect_value(TPMLIB_Process, locality, 0);
     will_return(TPMLIB_Process, rsp);
@@ -1094,7 +1114,7 @@ tcti_libtpms_remap_state_posix_fallocate_fail_test(void **state)
     unsigned char cmd[] = {0x80, 0x01, 0x00, 0x00, 0x00, 0x0c, 0x00, 0x00, 0x01, 0x44, 0x00, 0x00};
     unsigned char rsp[] = {0x80, 0x01, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00};
 
-    expect_value(TPMLIB_Process, cmd, cmd);
+    expect_memory(TPMLIB_Process, cmd, cmd, sizeof(cmd));
     expect_value(TPMLIB_Process, cmd_len, sizeof(cmd));
     expect_value(TPMLIB_Process, locality, 0);
     will_return(TPMLIB_Process, rsp);
@@ -1156,7 +1176,7 @@ tcti_libtpms_no_statefile_success_test(void **state)
     unsigned char rsp_out[sizeof(rsp)];
     size_t rsp_len_out = sizeof(rsp);
 
-    expect_value(TPMLIB_Process, cmd, cmd);
+    expect_memory(TPMLIB_Process, cmd, cmd, sizeof(cmd));
     expect_value(TPMLIB_Process, cmd_len, sizeof(cmd));
     expect_value(TPMLIB_Process, locality, 0);
     will_return(TPMLIB_Process, rsp);
@@ -1210,7 +1230,7 @@ tcti_libtpms_two_states_no_statefiles_success_test(void **state)
     tcti_common[1] = tcti_common_context_cast(ctxs[1]);
 
     /* ===== transmit on instance 0 ===== */
-    expect_value(TPMLIB_Process, cmd, cmd_aa);
+    expect_memory(TPMLIB_Process, cmd, cmd_aa, sizeof(cmd_aa));
     expect_value(TPMLIB_Process, cmd_len, sizeof(cmd_aa));
     expect_value(TPMLIB_Process, locality, 0);
     will_return(TPMLIB_Process, rsp_aa);
@@ -1231,7 +1251,7 @@ tcti_libtpms_two_states_no_statefiles_success_test(void **state)
     assert_int_equal(tcti_libtpms[0]->state_len, 0);
 
     /* ===== transmit on instance 1 ===== */
-    expect_value(TPMLIB_Process, cmd, cmd_bb);
+    expect_memory(TPMLIB_Process, cmd, cmd_bb, sizeof(cmd_bb));
     expect_value(TPMLIB_Process, cmd_len, sizeof(cmd_bb));
     expect_value(TPMLIB_Process, locality, 0);
     will_return(TPMLIB_Process, rsp_bb);
@@ -1308,7 +1328,7 @@ tcti_libtpms_two_states_success_test(void **state)
     tcti_common[1] = tcti_common_context_cast(ctxs[1]);
 
     /* ===== transmit on instance 0 ===== */
-    expect_value(TPMLIB_Process, cmd, cmd_aa);
+    expect_memory(TPMLIB_Process, cmd, cmd_aa, sizeof(cmd_aa));
     expect_value(TPMLIB_Process, cmd_len, sizeof(cmd_aa));
     expect_value(TPMLIB_Process, locality, 0);
     will_return(TPMLIB_Process, rsp_aa);
@@ -1336,7 +1356,7 @@ tcti_libtpms_two_states_success_test(void **state)
     assert_memory_equal(tcti_libtpms[0]->state_mmap, S1_STATE, S1_STATE_LEN);
 
     /* ===== transmit on instance 1 ===== */
-    expect_value(TPMLIB_Process, cmd, cmd_bb);
+    expect_memory(TPMLIB_Process, cmd, cmd_bb, sizeof(cmd_bb));
     expect_value(TPMLIB_Process, cmd_len, sizeof(cmd_bb));
     expect_value(TPMLIB_Process, locality, 0);
     will_return(TPMLIB_Process, rsp_bb);
